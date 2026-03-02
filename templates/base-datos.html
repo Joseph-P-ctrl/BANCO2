@@ -493,6 +493,10 @@
             applyThemeMode();
             applySidebarState();
             applyMainMenuState();
+            const shouldOpenMailSettings = {{ 'true' if (open_mail_settings|default(false)) else 'false' }};
+            if (shouldOpenMailSettings) {
+                openMailSettingsModal();
+            }
         });
     </script>
 </head>
@@ -524,6 +528,9 @@
                 <label class="form-label" for="mailPasswordInput">Contraseña</label>
                 <input id="mailPasswordInput" type="password" name="password" class="form-control" required>
             </div>
+            {% if quick_password_message|default('') %}
+            <div class="alert alert-warning py-2 px-3 mb-2">{{ quick_password_message }}</div>
+            {% endif %}
             <div class="form-check mt-1">
                 <input class="form-check-input" type="checkbox" id="mailPasswordShow" onchange="toggleMailPasswordVisibility()">
                 <label class="form-check-label" for="mailPasswordShow">Mostrar contraseña</label>
