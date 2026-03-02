@@ -1715,6 +1715,7 @@ def home():
         session.pop('home_success_message', None)
 
     general_settings = load_general_settings()
+    config_message = session.pop('config_message', None)
     photo_path = _profile_photo_path()
     has_profile_photo = os.path.exists(photo_path)
     profile_photo_version = general_settings.get('perfil', {}).get('foto_version', 0)
@@ -1727,7 +1728,7 @@ def home():
                 'home.html',
                 error_message='Debe subir por lo menos un archivo.',
                 processing_result=session.get('home_processing_result'),
-                mensaje_exito=session.get('home_success_message'),
+                mensaje_exito=config_message or session.get('home_success_message'),
                 has_profile_photo=has_profile_photo,
                 profile_photo_url=f"/foto_perfil_actual?v={profile_photo_version}"
             )
@@ -1768,7 +1769,7 @@ def home():
                     'home.html',
                     error_message=error_message,
                     processing_result=session.get('home_processing_result'),
-                    mensaje_exito=session.get('home_success_message'),
+                    mensaje_exito=config_message or session.get('home_success_message'),
                     has_profile_photo=has_profile_photo,
                     profile_photo_url=f"/foto_perfil_actual?v={profile_photo_version}"
                 )
@@ -1776,7 +1777,7 @@ def home():
         return render_template(
             'home.html',
             processing_result=session.get('home_processing_result'),
-            mensaje_exito=session.get('home_success_message'),
+            mensaje_exito=config_message or session.get('home_success_message'),
             has_profile_photo=has_profile_photo,
             profile_photo_url=f"/foto_perfil_actual?v={profile_photo_version}"
         )
@@ -1848,6 +1849,7 @@ def basedatos():
         return flow_redirect
 
     profile_photo_context = _profile_photo_context()
+    config_message = session.pop('config_message', None)
 
     if request.method == 'POST':
         files    = request.files.getlist('file')
@@ -1877,7 +1879,7 @@ def basedatos():
 
     else:
         nohay = 'Archivo subido correctamente.'
-        return render_template('base-datos.html', **profile_photo_context)
+        return render_template('base-datos.html', mensaje_exito=config_message, **profile_photo_context)
     
 @app.route('/asiento', methods=['POST'])
 def asiento_procesar():
@@ -1979,12 +1981,14 @@ def asiento_get():
     show_result_mode = request.args.get('resultado_correo', '0') == '1'
     asiento_emails = session.get('asiento_emails', [])
     vouchers_generados = session.get('vouchers_generados', [])
+    page_message = session.pop('config_message', None)
 
     return render_template(
         'asiento.html',
         show_result_mode=show_result_mode,
         asiento_emails=asiento_emails,
         total_vouchers=len(vouchers_generados),
+        mensaje_exito=page_message,
         **_profile_photo_context()
     )
 
@@ -2845,6 +2849,9 @@ def correo_electronico_verificar_vinculo():
 def configurar_correo():
     return_to = str(request.form.get('return_to', '')).strip().lower()
     redirect_to_correos = return_to == 'correos'
+    redirect_to_home = return_to == 'home'
+    redirect_to_basedatos = return_to == 'basedatos'
+    redirect_to_asiento = return_to == 'asiento'
 
     def _redirect_after_password(message_text, is_error=False):
         if redirect_to_correos:
@@ -2854,6 +2861,14 @@ def configurar_correo():
                 return redirect(url_for('correos', open_quick_password='1'))
             session['config_message'] = message_text
             return redirect(url_for('correos'))
+
+        if redirect_to_home or redirect_to_basedatos or redirect_to_asiento:
+            session['config_message'] = message_text
+            if redirect_to_home:
+                return redirect(url_for('home'))
+            if redirect_to_basedatos:
+                return redirect(url_for('basedatos'))
+            return redirect(url_for('asiento_get', resultado_correo=1))
 
         session['email_settings_message'] = message_text
         return redirect(url_for('correo_electronico'))
@@ -3443,8 +3458,12 @@ def send_emails():
     if auth_redirect is not None:
         return auth_redirect
 
+    request_source = str(request.form.get('source', '')).strip().lower()
+
     def _redirect_correos_with_message(message_text):
         session['config_message'] = message_text
+        if request_source == 'asiento':
+            return redirect(url_for('asiento_get', resultado_correo=1))
         return redirect(url_for('correos'))
 
     emails = session.get('asiento_emails', [])

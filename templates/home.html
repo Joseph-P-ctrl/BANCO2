@@ -46,6 +46,71 @@
             box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
         }
 
+        .mail-settings-btn {
+            width: 100%;
+            margin-top: 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            background: rgba(255, 255, 255, 0.12);
+            color: #e2e8f0;
+            font-weight: 700;
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            letter-spacing: 0.3px;
+        }
+
+        .mail-settings-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .mail-settings-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.42);
+            z-index: 10020;
+            display: none;
+        }
+
+        .mail-settings-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: min(460px, 92vw);
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 18px 42px rgba(15, 23, 42, 0.28);
+            z-index: 10021;
+            display: none;
+            padding: 18px;
+            text-align: left;
+        }
+
+        .mail-settings-modal h5 {
+            margin-bottom: 12px;
+            font-weight: 700;
+        }
+
+        .mail-settings-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .mail-settings-bottom {
+            position: absolute;
+            left: 14px;
+            right: 14px;
+            bottom: 14px;
+        }
+
+        .mail-settings-bottom .mail-settings-btn {
+            margin-top: 0;
+        }
+
         @keyframes fadeInScale {
             from { opacity: 0; transform: translate(-50%, -46%); }
             to { opacity: 1; transform: translate(-50%, -50%); }
@@ -129,7 +194,7 @@
             left: 0;
             right: 0;
             z-index: 999;
-            height: 74px;
+            height: 88px;
             background: rgba(255, 255, 255, 0.9);
             border-bottom: 1px solid #dbe4f0;
             backdrop-filter: blur(4px);
@@ -156,15 +221,15 @@
         }
 
         .collapsed-userbar {
-            display: block;
+            display: none;
             position: fixed;
-            top: 74px;
+            top: 88px;
             left: 0;
             right: 0;
             z-index: 998;
-            height: 74px;
+            height: 0;
             background: rgba(255, 255, 255, 0.55);
-            border-bottom: 1px solid #dbe4f0;
+            border-bottom: 0;
         }
 
         .corner-logout-btn {
@@ -262,7 +327,7 @@
             width: calc(100vw - 270px);
             max-width: none;
             margin-right: 0;
-            padding-top: 150px;
+            padding-top: 110px;
             border-top: 4px solid rgba(207, 216, 227, 0.75);
         }
 
@@ -271,7 +336,7 @@
             width: 100vw;
             padding-left: 18px;
             padding-right: 18px;
-            padding-top: 150px;
+            padding-top: 110px;
         }
 
         .sidebar-brand {
@@ -469,6 +534,29 @@ function submitAvatarUpload() {
     }
 }
 
+function openMailSettingsModal() {
+    const overlay = document.getElementById('mailSettingsOverlay');
+    const modal = document.getElementById('mailSettingsModal');
+    if (overlay) overlay.style.display = 'block';
+    if (modal) modal.style.display = 'block';
+}
+
+function closeMailSettingsModal() {
+    const overlay = document.getElementById('mailSettingsOverlay');
+    const modal = document.getElementById('mailSettingsModal');
+    if (overlay) overlay.style.display = 'none';
+    if (modal) modal.style.display = 'none';
+}
+
+function toggleMailPasswordVisibility() {
+    const passwordInput = document.getElementById('mailPasswordInput');
+    const showPassword = document.getElementById('mailPasswordShow');
+    if (!passwordInput || !showPassword) {
+        return;
+    }
+    passwordInput.type = showPassword.checked ? 'text' : 'password';
+}
+
 function toggleMainSidebar() {
     const hidden = !document.body.classList.contains('menu-hidden');
     document.body.classList.toggle('menu-hidden', hidden);
@@ -493,11 +581,33 @@ document.addEventListener('DOMContentLoaded', function () {
     </header>
     <div class="collapsed-userbar" aria-hidden="true"></div>
     <button type="button" class="corner-theme-btn" title="Modo claro/oscuro" aria-label="Modo claro/oscuro" onclick="toggleColorMode()">🌙</button>
-    <a class="corner-quick-btn" href="/correos" title="Ajustes" aria-label="Ajustes">⚙</a>
     <form id="avatarUploadForm" action="/subir_foto_perfil" method="POST" enctype="multipart/form-data" style="display:none;">
         <input type="hidden" name="next" value="home">
         <input id="avatarUploadInput" type="file" name="profile_image" accept=".png,.jpg,.jpeg,.webp" onchange="submitAvatarUpload()">
     </form>
+    <div id="mailSettingsOverlay" class="mail-settings-overlay"></div>
+    <section id="mailSettingsModal" class="mail-settings-modal" aria-label="Configuración de correo">
+        <h5>Configuración de correo</h5>
+        <form action="/configurar_correo" method="POST">
+            <input type="hidden" name="return_to" value="home">
+            <div class="mb-2">
+                <label class="form-label" for="mailSenderInput">Correo</label>
+                <input id="mailSenderInput" type="email" name="sender" class="form-control" value="{{ session.get('worker_sender', '') }}" required>
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="mailPasswordInput">Contraseña</label>
+                <input id="mailPasswordInput" type="password" name="password" class="form-control" required>
+            </div>
+            <div class="form-check mt-1">
+                <input class="form-check-input" type="checkbox" id="mailPasswordShow" onchange="toggleMailPasswordVisibility()">
+                <label class="form-check-label" for="mailPasswordShow">Mostrar contraseña</label>
+            </div>
+            <div class="mail-settings-actions">
+                <button type="button" class="btn btn-outline-secondary" onclick="closeMailSettingsModal()">Cerrar</button>
+                <button type="submit" class="btn btn-primary">Guardar</button>
+            </div>
+        </form>
+    </section>
     <div class="d-flex flex-column min-vh-100">
    <nav class="bg-body-tertiary py-2 menu-side-nav">
     <div class="sidebar-brand">
@@ -512,15 +622,7 @@ document.addEventListener('DOMContentLoaded', function () {
     </div>
     <div class="menu-card">
         <div class="w-100">
-            <button
-                id="mainMenuToggle"
-                type="button"
-                class="btn btn-primary w-100"
-                aria-expanded="false"
-                aria-controls="mainMenuList"
-                onclick="toggleMainMenuList()"
-            >Menú</button>
-            <ul class="nav nav-pills flex-column gap-2 mt-2 d-none" id="mainMenuList" role="tablist">
+            <ul class="nav nav-pills flex-column gap-2" id="mainMenuList" role="tablist">
                 <li class="nav-item">
                     <a class="nav-link active text-center" href="/">Home</a>
                 </li>
@@ -530,11 +632,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 <li class="nav-item">
                     <a class="nav-link text-center" href="/asiento">Asientos</a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link text-center" href="/correos">Correos</a>
-                </li>
             </ul>
         </div>
+    </div>
+    <div class="mail-settings-bottom">
+        <button type="button" class="mail-settings-btn" onclick="openMailSettingsModal()">
+            <span>AJUSTES</span>
+            <span aria-hidden="true">⚙</span>
+        </button>
     </div>
    </nav>
     <div class="flex-grow-1 container text-center content-with-menu">
@@ -552,7 +657,7 @@ document.addEventListener('DOMContentLoaded', function () {
         {% if processing_result %}
         <div class="container text-center pb-4">
             <div class="row download-stack g-3">
-                <div class="col-12">
+                <div class="col-6">
                     <div class="download-card">
                         <form action="/upload" method="POST" class="download-form" data-success-msg="✅ La descarga de movimientos fue exitosamente.">
                             <button type="submit" class="btn btn-success btn-lg w-100">Movimientos</button>
@@ -560,7 +665,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     </div>
                 </div>
 
-                <div class="col-12">
+                <div class="col-6">
                     <div class="download-card">
                         <form action="/download_recaudos" method="POST" class="download-form" data-success-msg="✅ La descarga de recaudos fue exitosamente.">
                             <button type="submit" class="btn btn-success btn-lg w-100">Recaudos</button>
