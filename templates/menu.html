@@ -178,8 +178,8 @@
                 onclick="toggleMainMenuList()"
             >Menú</button>
             <ul class="nav nav-pills flex-column gap-2 mt-2 d-none" id="mainMenuList">
-                <li class="nav-item"><a class="nav-link text-center {% if active_tab == 'home' %}active{% endif %}" href="{{ url_for('menu', tab='home') }}">Home</a></li>
                 <li class="nav-item"><a class="nav-link text-center {% if active_tab == 'basedatos' %}active{% endif %}" href="{{ url_for('menu', tab='basedatos') }}">Base de Datos</a></li>
+                <li class="nav-item"><a class="nav-link text-center {% if active_tab == 'home' %}active{% endif %}" href="{{ url_for('menu', tab='home') }}">Movimientos</a></li>
                 <li class="nav-item"><a class="nav-link text-center {% if active_tab == 'asiento' %}active{% endif %}" href="{{ url_for('menu', tab='asiento') }}">Asientos</a></li>
                 <li class="nav-item"><a class="nav-link text-center {% if active_tab == 'correos' %}active{% endif %}" href="{{ url_for('menu', tab='correos') }}">Correos</a></li>
             </ul>

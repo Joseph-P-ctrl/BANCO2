@@ -469,7 +469,7 @@ def _validate_office365_and_smtp_login(sender, password, smtp_host, smtp_port, s
     return True, validated_sender, used_security, ''
 
 
-def save_secure_smtp_credentials(sender_value, password_value, smtp_host_value=None, smtp_port_value=None, smtp_security_value=None):
+def save_secure_smtp_credentials(sender_value, password_value, smtp_host_value=None, smtp_port_value=None, smtp_security_value=None, cc_value=None):
     fernet = _get_fernet()
     payload = {
         'sender_encrypted': fernet.encrypt(sender_value.encode('utf-8')).decode('utf-8'),
@@ -481,6 +481,13 @@ def save_secure_smtp_credentials(sender_value, password_value, smtp_host_value=N
         payload['smtp_port'] = str(smtp_port_value).strip()
     if smtp_security_value is not None:
         payload['smtp_security'] = str(smtp_security_value).strip().lower()
+    if cc_value is None:
+        existing = load_secure_smtp_credentials()
+        existing_cc = str(existing.get('cc', '')).strip()
+        if existing_cc:
+            payload['cc'] = existing_cc
+    else:
+        payload['cc'] = str(cc_value).strip().lower()
     with open(_smtp_credentials_path(), 'w', encoding='utf-8') as out_file:
         json.dump(payload, out_file, ensure_ascii=False)
 
@@ -507,7 +514,8 @@ def load_secure_smtp_credentials():
             'password': password_value,
             'smtp_host': str(payload.get('smtp_host', '')).strip(),
             'smtp_port': str(payload.get('smtp_port', '')).strip(),
-            'smtp_security': str(payload.get('smtp_security', '')).strip().lower()
+            'smtp_security': str(payload.get('smtp_security', '')).strip().lower(),
+            'cc': str(payload.get('cc', '')).strip().lower()
         }
     except Exception as ex:
         logging.error(f'No se pudo leer credenciales SMTP cifradas: {ex}')
@@ -1388,7 +1396,6 @@ Le informamos que hemos recibido un abono en nuestra cuenta corriente del BANCO 
 
 
 
-Para proceder con sus recibos, le invitamos a acceder a nuestra plataforma de Oficina Virtual ENSA.
 https://servicios.distriluz.com.pe/oficinavirtual
 
 En esta plataforma, podrá registrarse como Cliente Empresa para gestionar la cancelación de los suministros afiliados a su representada y agregar otros suministros. Podrá adjuntar la constancia del pago o transferencia realizada para completar el proceso.
@@ -1420,12 +1427,17 @@ def build_voucher_email_html(saludo, voucher_info=None):
         <div style="max-width:760px; margin:20px auto; background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden;">
             <div style="background:linear-gradient(135deg, #1e5da8 0%, #274b8f 100%); color:#ffffff; padding:18px 22px;">
                 <div style="font-size:13px; opacity:0.95; letter-spacing:0.2px;">ENSA</div>
-                <div style="font-size:22px; font-weight:700; margin-top:2px;">Voucher de Abono Recibido</div>
+                <div style="font-size:22px; font-weight:700; margin-top:2px;">ABONO RECIBIDO - DESCARGUE SU RECIBO EN PLATAFORMA OFICINA VIRTUAL CLIENTE EMPRESA</div>
             </div>
 
             <div style="padding:20px 22px 10px 22px;">
                 <p style="margin:0 0 10px 0; font-size:18px; font-weight:700; color:#1e5da8;">
-                    ENSA - Voucher de Abono Recibido
+                    ENSA - ABONO RECIBIDO - DESCARGUE SU RECIBO EN PLATAFORMA OFICINA VIRTUAL CLIENTE EMPRESA
+                </p>
+                <p style="margin:0 0 14px 0; font-size:14px;">
+                    <a href="https://servicios.distriluz.com.pe/oficinavirtual" style="color:#1e5da8; text-decoration:underline; font-weight:600;">
+                        https://servicios.distriluz.com.pe/oficinavirtual
+                    </a>
                 </p>
                 <p style="margin:0 0 14px 0; font-size:15px;">{saludo}</p>
                 <p style="margin:0 0 14px 0; font-size:14px; color:#374151;">
@@ -1464,16 +1476,6 @@ def build_voucher_email_html(saludo, voucher_info=None):
                     </tr>
                 </table>
 
-                <p style="margin:0 0 10px 0; font-size:14px;">
-                    Para proceder con sus recibos, le invitamos a acceder a nuestra plataforma de <strong style="color:#1e5da8;">Oficina Virtual ENSA</strong>.
-                </p>
-
-                <p style="margin:0 0 14px 0; font-size:14px;">
-                    <a href="https://servicios.distriluz.com.pe/oficinavirtual" style="color:#1e5da8; text-decoration:underline; font-weight:600;">
-                        https://servicios.distriluz.com.pe/oficinavirtual
-                    </a>
-                </p>
-
                 <p style="margin:0 0 12px 0; font-size:14px; color:#374151;">
                     En esta plataforma, podrá registrarse como Cliente Empresa para gestionar la cancelación de los suministros afiliados a su representada y agregar otros suministros.
                     <strong style="color:#1e5da8;">Podrá adjuntar la constancia del pago o transferencia realizada para completar el proceso.</strong>
@@ -1481,7 +1483,7 @@ def build_voucher_email_html(saludo, voucher_info=None):
             </div>
 
             <div style="border-top:1px solid #e5e7eb; background:#fafbfc; padding:14px 22px; font-size:13px; color:#4b5563;">
-                Agradecemos su atención y quedamos a su disposición para cualquier consulta adicional al CEL. 979 450 731 o al correo electrónico: <strong>recaudacionensa@distriluz.com.pe</strong>
+                Agradecemos su atención y quedamos a su disposición para cualquier consulta adicional al CEL. <a href="https://wa.me/51979450731" style="color:#25D366 !important; text-decoration:underline; font-weight:700;">🟢 WhatsApp 979 450 731</a> o al correo electrónico: <strong>recaudacionensa@distriluz.com.pe</strong>
             </div>
         </div>
     </body>
@@ -1581,7 +1583,8 @@ def render_correos_page(emails=None, mensaje_exito=None, page=1, quick_password_
         'sender': secure_smtp.get('sender', ''),
         'smtp_host': secure_smtp.get('smtp_host', '') or 'owa.fonafe.gob.pe',
         'smtp_port': secure_smtp.get('smtp_port', '') or '587',
-        'smtp_security': secure_smtp.get('smtp_security', '') or 'starttls'
+        'smtp_security': secure_smtp.get('smtp_security', '') or 'starttls',
+        'cc': secure_smtp.get('cc', '')
     }
     google_config = load_google_config()
     general_settings = load_general_settings()
@@ -1997,6 +2000,8 @@ def asiento_get():
     show_result_mode = request.args.get('resultado_correo', '0') == '1'
     asiento_emails = session.get('asiento_emails', [])
     vouchers_generados = session.get('vouchers_generados', [])
+    secure_smtp = load_secure_smtp_credentials()
+    mail_cc = str(session.get('worker_cc', '')).strip() or str(secure_smtp.get('cc', '')).strip()
     page_message = session.pop('config_message', None)
     quick_password_message = session.pop('quick_password_message', None)
     open_mail_settings = bool(session.pop('open_mail_settings', False)) or bool(quick_password_message)
@@ -2006,6 +2011,7 @@ def asiento_get():
         show_result_mode=show_result_mode,
         asiento_emails=asiento_emails,
         total_vouchers=len(vouchers_generados),
+        mail_cc=mail_cc,
         mensaje_exito=page_message,
         quick_password_message=quick_password_message,
         open_mail_settings=open_mail_settings,
@@ -2904,12 +2910,24 @@ def configurar_correo():
     existing = load_secure_smtp_credentials()
     sender = request.form.get('sender', '').strip() or existing.get('sender', '').strip()
     password = request.form.get('password', '').strip() or existing.get('password', '').strip()
+    confirm_password_raw = request.form.get('confirm_password', None)
+    confirm_password = '' if confirm_password_raw is None else str(confirm_password_raw).strip()
+    cc_value = request.form.get('cc', '').strip() or existing.get('cc', '').strip()
     smtp_host = request.form.get('smtp_host', '').strip() or existing.get('smtp_host', '').strip() or 'owa.fonafe.gob.pe'
     smtp_port = _parse_smtp_port(request.form.get('smtp_port', '').strip() or existing.get('smtp_port', '').strip() or '587')
     smtp_security = _normalize_smtp_security(request.form.get('smtp_security', '').strip().lower() or existing.get('smtp_security', '').strip().lower() or 'starttls')
 
+    cc_clean_items = [extract_single_email(item) for item in re.split(r'[;,]+', str(cc_value)) if str(item).strip()]
+    cc_clean = ', '.join(dict.fromkeys(item for item in cc_clean_items if item))
+
     if not sender or not password:
         return _redirect_after_password('Completa remitente y contraseña para continuar.', is_error=True)
+
+    if confirm_password_raw is not None:
+        if not confirm_password:
+            return _redirect_after_password('Repite la contraseña para continuar.', is_error=True)
+        if password != confirm_password:
+            return _redirect_after_password('Las contraseñas no coinciden. Intenta de nuevo.', is_error=True)
 
     is_valid, validated_sender, used_security, error_message = _validate_office365_and_smtp_login(
         sender,
@@ -2930,7 +2948,8 @@ def configurar_correo():
             password,
             smtp_host_value=smtp_host,
             smtp_port_value=str(smtp_port),
-            smtp_security_value=used_security
+            smtp_security_value=used_security,
+            cc_value=cc_clean
         )
         sync_email_config_to_modules(validated_sender)
         session['system_authenticated'] = True
@@ -2941,6 +2960,7 @@ def configurar_correo():
         session['worker_smtp_host'] = smtp_host
         session['worker_smtp_port'] = str(smtp_port)
         session['worker_smtp_security'] = used_security
+        session['worker_cc'] = cc_clean
         session['worker_auth_method'] = str(session.get('worker_auth_method', '')).strip() or 'SMTP OWA'
         session['quick_password_verified'] = True
         add_account_activity('Contraseña de correo', f'Sesión iniciada para {validated_sender}')
@@ -3533,9 +3553,11 @@ def send_emails():
     session_smtp_host = str(session.get('worker_smtp_host', '')).strip()
     session_smtp_port = str(session.get('worker_smtp_port', '')).strip()
     session_smtp_security = str(session.get('worker_smtp_security', '')).strip().lower()
+    session_cc = str(session.get('worker_cc', '')).strip()
 
     sender = form_sender or session_sender or os.environ.get('OUTLOOK_SENDER', '').strip() or secure_smtp.get('sender', '').strip()
     password = form_password or session_password or os.environ.get('OUTLOOK_PASSWORD', '').strip() or secure_smtp.get('password', '').strip()
+    cc_raw = request.form.get('cc', '').strip() or session_cc or secure_smtp.get('cc', '').strip()
     subject_env = os.environ.get('OUTLOOK_SUBJECT', '').strip()
     subject = subject_env or 'Confirmación de Abono Recibido - ENSA'
     subject = re.sub(r'distriluz\s+ensa', 'ENSA', subject, flags=re.IGNORECASE).strip()
@@ -3552,6 +3574,10 @@ def send_emails():
         logging.warning(f"OUTLOOK_SMTP_SECURITY inválido ('{smtp_security}'). Usando 'starttls'.")
         smtp_security = 'starttls'
 
+    cc_items = [extract_single_email(item) for item in re.split(r'[;,]+', str(cc_raw)) if str(item).strip()]
+    cc_recipients = list(dict.fromkeys(item for item in cc_items if item))
+    cc_clean = ', '.join(cc_recipients)
+
     should_save_smtp = request.form.get('save_smtp', 'yes').strip().lower() in ('yes', 'on', 'true', '1')
     if should_save_smtp and sender and password:
         try:
@@ -3560,9 +3586,11 @@ def send_emails():
                 password,
                 smtp_host_value=smtp_host,
                 smtp_port_value=str(smtp_port),
-                smtp_security_value=smtp_security
+                smtp_security_value=smtp_security,
+                cc_value=cc_clean
             )
             sync_email_config_to_modules(sender)
+            session['worker_cc'] = cc_clean
         except Exception as save_ex:
             logging.warning(f'No se pudo persistir configuración SMTP desde envío manual: {save_ex}')
 
@@ -3685,6 +3713,10 @@ def send_emails():
                     msg['Subject'] = subject
                     msg['From'] = sender
                     msg['To'] = recipient
+                    recipient_lower = recipient.strip().lower()
+                    cc_for_message = [cc for cc in cc_recipients if cc != recipient_lower]
+                    if cc_for_message:
+                        msg['Cc'] = ', '.join(cc_for_message)
                     msg.set_content(body_text)
                     msg.add_alternative(body_html, subtype='html')
 

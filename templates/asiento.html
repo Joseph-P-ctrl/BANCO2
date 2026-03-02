@@ -434,6 +434,41 @@ function closeFloatingAlert() {
     if (floatingAlert) floatingAlert.style.display = 'none';
 }
 
+let pendingAsientoDownload = null;
+
+function hideDownloadAfterProcess() {
+    const wrapper = document.getElementById('downloadAfterProcessWrap');
+    if (wrapper) {
+        wrapper.style.display = 'none';
+    }
+}
+
+function showDownloadAfterProcess() {
+    const wrapper = document.getElementById('downloadAfterProcessWrap');
+    if (wrapper) {
+        wrapper.style.display = 'flex';
+    }
+}
+
+function downloadAsientoProcessedFile() {
+    if (!pendingAsientoDownload) {
+        showProcessFeedback('❌ No hay archivo procesado para descargar.', 'error');
+        return;
+    }
+
+    const { blob, filename } = pendingAsientoDownload;
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || 'asientos.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+
+    window.location.href = '/asiento?resultado_correo=1';
+}
+
 async function handleAsientoSubmit(event) {
     event.preventDefault();
 
@@ -444,6 +479,8 @@ async function handleAsientoSubmit(event) {
 
     submitBtn.setAttribute('disabled', 'true');
     loaderTarget.style.display = 'inline-block';
+    hideDownloadAfterProcess();
+    pendingAsientoDownload = null;
 
     try {
         const response = await fetch(form.action, {
@@ -466,17 +503,9 @@ async function handleAsientoSubmit(event) {
                 filename = decodeURIComponent(fileMatch[1] || fileMatch[2] || filename);
             }
 
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
-
-            form.reset();
-            window.location.href = '/asiento?resultado_correo=1';
+            pendingAsientoDownload = { blob, filename };
+            showDownloadAfterProcess();
+            showProcessFeedback('✅ Proceso completado. Haz clic en "Descargar" para continuar al envío de correos.', 'success');
             return;
         }
 
@@ -565,11 +594,16 @@ async function handleAsientoSubmit(event) {
 
     function toggleMailPasswordVisibility() {
         const passwordInput = document.getElementById('mailPasswordInput');
+        const confirmPasswordInput = document.getElementById('mailConfirmPasswordInput');
         const showPassword = document.getElementById('mailPasswordShow');
         if (!passwordInput || !showPassword) {
             return;
         }
-        passwordInput.type = showPassword.checked ? 'text' : 'password';
+        const inputType = showPassword.checked ? 'text' : 'password';
+        passwordInput.type = inputType;
+        if (confirmPasswordInput) {
+            confirmPasswordInput.type = inputType;
+        }
     }
 
     function toggleMainSidebar() {
@@ -614,13 +648,21 @@ async function handleAsientoSubmit(event) {
                 <label class="form-label" for="mailPasswordInput">Contraseña</label>
                 <input id="mailPasswordInput" type="password" name="password" class="form-control" required>
             </div>
-            {% if quick_password_message|default('') %}
-            <div class="alert alert-warning py-2 px-3 mb-2">{{ quick_password_message }}</div>
-            {% endif %}
-            <div class="form-check mt-1">
+            <div class="mb-2">
+                <label class="form-label" for="mailConfirmPasswordInput">Repetir contraseña</label>
+                <input id="mailConfirmPasswordInput" type="password" name="confirm_password" class="form-control" required>
+            </div>
+            <div class="form-check mt-1 mb-2">
                 <input class="form-check-input" type="checkbox" id="mailPasswordShow" onchange="toggleMailPasswordVisibility()">
                 <label class="form-check-label" for="mailPasswordShow">Mostrar contraseña</label>
             </div>
+            <div class="mb-2">
+                <label class="form-label" for="mailCcInput">CC (correo en copia)</label>
+                <input id="mailCcInput" type="text" name="cc" class="form-control" value="{{ mail_cc|default('') }}" placeholder="correo1@dominio.com, correo2@dominio.com">
+            </div>
+            {% if quick_password_message|default('') %}
+            <div class="alert alert-warning py-2 px-3 mb-2">{{ quick_password_message }}</div>
+            {% endif %}
             <div class="mail-settings-actions">
                 <button type="button" class="btn btn-outline-secondary" onclick="closeMailSettingsModal()">Cerrar</button>
                 <button type="submit" class="btn btn-primary">Guardar</button>
@@ -642,10 +684,10 @@ async function handleAsientoSubmit(event) {
             <div class="w-100">
                 <ul class="nav nav-pills flex-column gap-2" id="mainMenuList" role="tablist">
                     <li class="nav-item">
-                        <a class="nav-link text-center" href="/">Home</a>
+                        <a class="nav-link text-center" href="/basedatos">Base de Datos</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link text-center" href="/basedatos">Base de Datos</a>
+                        <a class="nav-link text-center" href="/">Movimientos</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link active text-center" href="/asiento">Asientos</a>
@@ -730,15 +772,9 @@ async function handleAsientoSubmit(event) {
                             </table>
                         </div>
 
-                        <div class="form-check mb-3 mt-3 text-start">
-                            <input class="form-check-input" type="checkbox" id="manual_confirm" name="manual_confirm" value="yes" required>
-                            <label class="form-check-label" for="manual_confirm">
-                                Confirmo que deseo enviar manualmente solo los correos seleccionados.
-                            </label>
-                        </div>
-
                         <div class="d-flex justify-content-center gap-2 mt-3">
                             <a href="/asiento" class="btn btn-secondary">Regresar</a>
+                            <input type="hidden" name="manual_confirm" value="yes">
                             <input type="hidden" name="source" value="asiento">
                             <button type="submit" class="btn btn-success">Enviar seleccionados</button>
                         </div>
@@ -780,18 +816,13 @@ async function handleAsientoSubmit(event) {
 
                     </div>
 
-                    <div class="row">
-                        <div class="col">
-
-                            <div class="d-grid gap-2 col-6 mx-auto">
-                                <input id="submitBtn" class="btn btn-primary" type="submit" value="Procesar">
-                        
-
+                    <div class="row justify-content-center mt-2">
+                        <div class="col-12 col-md-6 d-flex gap-2">
+                            <input id="submitBtn" class="btn btn-primary flex-fill" type="submit" value="Procesar">
+                            <div id="downloadAfterProcessWrap" class="flex-fill" style="display:none;">
+                                <button id="downloadAfterProcessBtn" class="btn btn-success w-100" type="button">Descargar</button>
                             </div>
-
-
                         </div>
-
                     </div>
                     </div>
                 </form>
@@ -818,13 +849,15 @@ if (floatingAlert && floatingAlert.dataset.autoDismiss === '1') {
 document.addEventListener('DOMContentLoaded', function () {
     var form = document.querySelector('form[action="/asiento"]');
     initAsientoEmailSelection();
-    const shouldOpenMailSettings = {{ 'true' if (open_mail_settings|default(false)) else 'false' }};
-    if (shouldOpenMailSettings) {
-        openMailSettingsModal();
-    }
     if (!form) {
         return;
     }
+
+    const downloadBtn = document.getElementById('downloadAfterProcessBtn');
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', downloadAsientoProcessedFile);
+    }
+
     form.addEventListener('submit', handleAsientoSubmit);
 });
 
